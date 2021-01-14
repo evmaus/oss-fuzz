@@ -21,7 +21,6 @@ CMAKE_SETTINGS=(
   "-D BUILD_SHARED_LIBS=OFF"         # Build static libraries only
   "-D PYILMBASE_ENABLE=OFF"          # Don't build Python support
   "-D BUILD_TESTING=OFF"             # Or tests
-  "-D OPENEXR_BUILD_UTILS=OFF"       # Or utilities
   "-D INSTALL_OPENEXR_EXAMPLES=OFF"  # Or examples
   "-D OPENEXR_LIB_SUFFIX="           # Don't append the version number to library files
   "-D ILMBASE_LIB_SUFFIX="
@@ -30,23 +29,22 @@ cmake $SRC/openexr ${CMAKE_SETTINGS[@]}
 make -j$(nproc)
 
 INCLUDES=(
-  "-I $SRC/openexr/OpenEXR/IlmImf"
-  "-I $SRC/openexr/IlmBase/Imath"
-  "-I $SRC/openexr/IlmBase/Iex"
-  "-I $SRC/openexr/IlmBase/Half"
-  "-I $WORK/OpenEXR/config"
-  "-I $WORK/IlmBase/config"
+  "-I $SRC"
+  "-I $SRC/openexr/src/lib/OpenEXR"
+  "-I $SRC/openexr/src/lib/OpenEXRUtil"
+  "-I $WORK/cmake"
 )
 
 LIBS=(
-  "$WORK/OpenEXR/IlmImf/libIlmImf.a"
-  "$WORK/IlmBase/Iex/libIex.a"
-  "$WORK/IlmBase/Half/libHalf.a"
-  "$WORK/IlmBase/IlmThread/libIlmThread.a"
-  "$WORK/IlmBase/Imath/libImath.a"
+  "$WORK/src/lib/OpenEXRUtil/libOpenEXRUtil.a"
+  "$WORK/src/lib/OpenEXR/libOpenEXR.a"
+  "$WORK/src/lib/Iex/libIex.a"
+  "$WORK/src/lib/IexMath/libIexMath.a"
+  "$WORK/src/lib/IlmThread/libIlmThread.a"
+  "$WORK/_deps/imath-build/src/Imath/libImath*.a"
 )
 
-for fuzzer in $SRC/*_fuzzer.cc; do
+for fuzzer in $SRC/openexr/src/test/OpenEXRFuzzTest/oss-fuzz/*_fuzzer.cc; do
   fuzzer_basename=$(basename -s .cc $fuzzer)
   $CXX $CXXFLAGS -std=c++11 -pthread ${INCLUDES[@]} $fuzzer $LIB_FUZZING_ENGINE ${LIBS[@]} -lz \
     -o $OUT/$fuzzer_basename

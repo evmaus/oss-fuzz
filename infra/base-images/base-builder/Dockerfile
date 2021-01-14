@@ -23,44 +23,16 @@ RUN dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y \
         binutils-dev \
-        build-essential \
         curl \
         git \
         jq \
         libc6-dev-i386 \
+        patchelf \
         subversion \
         zip
 
-# Install cmake.
-ENV CMAKE_VERSION 3.17.3
-RUN curl -L -O https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-Linux-x86_64.sh && \
-    chmod +x cmake-$CMAKE_VERSION-Linux-x86_64.sh && \
-    ./cmake-$CMAKE_VERSION-Linux-x86_64.sh --skip-license --prefix="/usr/local" && \
-    rm cmake-$CMAKE_VERSION-Linux-x86_64.sh
-
-# Build and install latest Python 3 (3.8.3).
-ENV PYTHON_VERSION 3.8.3
-RUN export PYTHON_DEPS="\
-        zlib1g-dev \
-        libncurses5-dev \
-        libgdbm-dev \
-        libnss3-dev \
-        libssl-dev \
-        libsqlite3-dev \
-        libreadline-dev \
-        libffi-dev \
-        libbz2-dev \
-        liblzma-dev" && \
-    apt-get install -y $PYTHON_DEPS && \
-    cd /tmp/ && \
-    curl -O https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tar.xz && \
-    tar -xvf Python-$PYTHON_VERSION.tar.xz && \
-    cd Python-$PYTHON_VERSION && \
-    ./configure --enable-optimizations && \
-    make -j install && \
-    cd .. && \
-    rm -r /tmp/Python-$PYTHON_VERSION.tar.xz /tmp/Python-$PYTHON_VERSION && \
-    apt-get remove -y $PYTHON_DEPS  # https://github.com/google/oss-fuzz/issues/3888
+# Install latest atheris for python fuzzing, pyinstaller for fuzzer packaging.
+RUN unset CFLAGS CXXFLAGS && pip3 install -v atheris pyinstaller==4.1
 
 # Download and install the latest stable Go.
 ADD https://storage.googleapis.com/golang/getgo/installer_linux $SRC/
@@ -85,6 +57,8 @@ ENV RUSTUP_HOME=/rust/rustup
 ENV PATH=$PATH:/rust/bin
 RUN curl https://sh.rustup.rs | sh -s -- -y --default-toolchain=nightly
 RUN cargo install cargo-fuzz
+# Needed to recompile rust std library for MSAN
+RUN rustup component add rust-src --toolchain nightly
 
 # Default build flags for various sanitizers.
 ENV SANITIZER_FLAGS_address "-fsanitize=address -fsanitize-address-use-after-scope"
@@ -148,9 +122,10 @@ RUN mkdir honggfuzz && \
     rm -rf $SRC/oss-fuzz.tar.gz
 
 COPY compile compile_afl compile_dataflow compile_libfuzzer compile_honggfuzz \
-    precompile_honggfuzz srcmap write_labels.py /usr/local/bin/
+    compile_go_fuzzer precompile_honggfuzz srcmap write_labels.py /usr/local/bin/
 
 COPY detect_repo.py /opt/cifuzz/
+COPY ossfuzz_coverage_runner.go $GOPATH
 
 RUN precompile_honggfuzz
 
